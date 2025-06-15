@@ -2,6 +2,8 @@
 'use client'
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function StronaRejestracji() {
   const [formData, setFormData] = useState({
@@ -18,8 +20,13 @@ export default function StronaRejestracji() {
   const [pokazPowtorzHaslo, setPokazPowtorzHaslo] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
+  const [sukces, setSukces] = useState(false)
 
-  const handleSubmit = (e) => {
+  // DODANE: Hook do autoryzacji
+  const { signup } = useAuth()
+  const router = useRouter()
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
     
     // Podstawowa walidacja
@@ -38,9 +45,37 @@ export default function StronaRejestracji() {
     
     if (Object.keys(newErrors).length === 0) {
       setLoading(true)
-      // Później tutaj będzie logika Firebase Auth
-      console.log('Rejestracja:', formData)
-      setTimeout(() => setLoading(false), 1000) // Symulacja
+      
+      // ZMIENIONE: Używamy funkcji signup z useAuth
+      const result = await signup(
+        formData.email, 
+        formData.haslo, 
+        formData.imie, 
+        formData.nazwisko
+      )
+      
+      if (result.success) {
+        setSukces(true)
+        // Przekieruj po 2 sekundach
+        setTimeout(() => {
+          router.push('/logowanie?message=rejestracja_zakonczona')
+        }, 2000)
+      } else {
+        // Obsługa błędów Firebase
+        let errorMessage = 'Wystąpił błąd podczas rejestracji'
+        
+        if (result.error.includes('email-already-in-use')) {
+          errorMessage = 'Ten adres email jest już zarejestrowany'
+        } else if (result.error.includes('weak-password')) {
+          errorMessage = 'Hasło jest za słabe'
+        } else if (result.error.includes('invalid-email')) {
+          errorMessage = 'Nieprawidłowy format adresu email'
+        }
+        
+        setErrors({ general: errorMessage })
+      }
+      
+      setLoading(false)
     }
   }
 
@@ -55,6 +90,27 @@ export default function StronaRejestracji() {
     if (errors[name]) {
       setErrors({ ...errors, [name]: '' })
     }
+  }
+
+  // DODANE: Strona sukcesu po rejestracji
+  if (sukces) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-16 flex items-center justify-center">
+        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="text-6xl mb-6">🎉</div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">
+            Konto zostało utworzone!
+          </h1>
+          <p className="text-gray-600 mb-6">
+            Dziękujemy za rejestrację. Twoje konto jest już aktywne.
+            Za chwilę zostaniesz przekierowany do strony logowania.
+          </p>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="bg-green-600 h-2 rounded-full animate-pulse" style={{width: '100%'}}></div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -74,6 +130,13 @@ export default function StronaRejestracji() {
                 Dołącz do społeczności Ever i ciesz się zakupami
               </p>
             </div>
+
+            {/* DODANE: Błędy ogólne */}
+            {errors.general && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+                {errors.general}
+              </div>
+            )}
 
             {/* Formularz rejestracji */}
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -270,7 +333,11 @@ export default function StronaRejestracji() {
             </div>
 
             {/* Rejestracja przez Google */}
-            <button className="w-full border-2 border-gray-300 text-gray-800 py-4 px-6 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors font-semibold mb-6 flex items-center justify-center">
+            <button 
+              type="button"
+              disabled={loading}
+              className="w-full border-2 border-gray-300 text-gray-800 py-4 px-6 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors font-semibold mb-6 flex items-center justify-center disabled:opacity-50"
+            >
               <span className="mr-3 text-xl">🔍</span>
               Zarejestruj się przez Google
             </button>
